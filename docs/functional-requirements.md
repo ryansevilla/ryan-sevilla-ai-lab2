@@ -1,22 +1,27 @@
 # TODO App Functional Requirements
 
-## Core Requirements
+## Task Management
 
-1. The user can create a new task with a required title.
-2. The user can view a list of all tasks.
-3. The user can edit an existing task's title and description.
-4. The user can mark a task as complete or incomplete.
-5. The user can delete a task.
-6. The user can set an optional due date for a task.
-7. The user can assign a priority level to a task (for example: low, medium, high).
-8. The user can filter tasks by status (all, active, completed).
-9. The user can sort tasks in a defined order (for example: due date, priority, then creation time).
-10. The user can search tasks by keyword in the title or description.
+1. The user can create a new task with a required title and an optional description.
+2. The user can edit an existing task's title and description.
+3. The user can delete a task permanently.
+4. The user can mark a task as complete or toggle it back to incomplete.
 
-## Data and Behavior Requirements
+## Due Dates & Priority
 
-1. The app preserves tasks between sessions (persistent storage).
-2. Each task includes at minimum: unique ID, title, completion status, created timestamp, and updated timestamp.
-3. Overdue tasks are visually identifiable when the due date has passed and the task is not complete.
-4. Input validation prevents saving a task with an empty title.
-5. Task list updates immediately after create, edit, complete, or delete actions.
+5. The user can add an optional due date to any task.
+6. The user can assign a priority level to a task: Low, Medium, or High.
+7. Tasks with a past due date that are not yet complete are visually marked as overdue.
+
+## Sorting & Filtering
+
+8. Tasks are sorted by default in this order: overdue first, then by due date (ascending), then by priority (High → Medium → Low), then by creation time (newest first).
+9. The user can filter tasks by status: All, Active, or Completed.
+10. The user can search tasks by keyword matched against the title or description.
+
+## Data & Persistence
+
+11. Tasks are saved to persistent storage so they survive a page refresh or browser restart.
+12. Each task stores at minimum: a unique ID, title, description, completion status, priority, due date, created-at timestamp, and updated-at timestamp.
+13. Input validation prevents saving a task with an empty or whitespace-only title.
+14. The task list updates immediately after any create, edit, complete, or delete action with no manual refresh required.
