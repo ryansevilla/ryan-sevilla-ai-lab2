@@ -67,7 +67,7 @@ test.describe('TODO App — critical user journeys', () => {
 
     await todoPage.deleteTodo(title);
 
-    await expect(page.getByText(title)).toHaveCount(0);
+    await expect(page.getByTestId('todo-card').filter({ hasText: title })).toHaveCount(0);
   });
 
   // 5. Filter by Active status hides completed tasks
@@ -89,7 +89,7 @@ test.describe('TODO App — critical user journeys', () => {
     await todoPage.filterByStatus('Active');
 
     await expect(page.getByText(activeTitle)).toBeVisible();
-    await expect(page.getByText(completedTitle)).toHaveCount(0);
+    await expect(page.getByTestId('todo-card').filter({ hasText: completedTitle })).toHaveCount(0);
   });
 
   // 6. Filter by Completed status hides active tasks
@@ -110,7 +110,7 @@ test.describe('TODO App — critical user journeys', () => {
 
     await todoPage.filterByStatus('Completed');
 
-    await expect(page.getByText(completedTitle)).toBeVisible();
+    await expect(page.getByTestId('todo-card').filter({ hasText: completedTitle })).toBeVisible();
     await expect(page.getByText(activeTitle)).toHaveCount(0);
   });
 
@@ -132,7 +132,7 @@ test.describe('TODO App — critical user journeys', () => {
     await todoPage.search('Searchable Unique Keyword');
 
     await expect(page.getByText(matchTitle)).toBeVisible();
-    await expect(page.getByText(noMatchTitle)).toHaveCount(0);
+    await expect(page.getByTestId('todo-card').filter({ hasText: noMatchTitle })).toHaveCount(0);
   });
 
   // 8. Validate that an empty title shows an error and does not submit

@@ -18,7 +18,7 @@ class TodoPage {
 
   async openAddTaskDialog() {
     await this.page.getByRole('button', { name: /add new task/i }).click();
-    await this.page.waitForSelector('[role="dialog"]');
+    await this.page.getByRole('dialog', { name: 'Add New Task' }).waitFor({ state: 'visible' });
   }
 
   async fillTaskForm({ title, description, priority, dueDate } = {}) {
@@ -57,7 +57,10 @@ class TodoPage {
 
   async toggleTodo(title) {
     const card = await this.getTodoCardByTitle(title);
-    await card.getByRole('button', { name: /mark task (complete|incomplete)/i }).click();
+    await Promise.all([
+      this.page.waitForResponse(resp => resp.url().includes('/toggle')),
+      card.getByRole('button', { name: /mark task (complete|incomplete)/i }).click(),
+    ]);
   }
 
   async editTodo(title) {
@@ -84,7 +87,8 @@ class TodoPage {
   // ---- Assertions ----
 
   async waitForTodo(title) {
-    await this.page.getByText(title).waitFor({ state: 'visible' });
+    await this.page.locator('[role="dialog"]').waitFor({ state: 'hidden' });
+    await this.page.getByTestId('todo-card').filter({ hasText: title }).waitFor({ state: 'visible' });
   }
 
   async waitForTodoGone(title) {
