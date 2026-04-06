@@ -1,126 +1,133 @@
-import React, { useState, useEffect } from 'react';
-import './App.css';
+import React, { useState } from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+import Container from '@mui/material/Container';
+import Typography from '@mui/material/Typography';
+import Alert from '@mui/material/Alert';
+import AddIcon from '@mui/icons-material/Add';
+
+import useTodos from './hooks/useTodos';
+import TodoCard from './components/TodoCard';
+import TodoForm from './components/TodoForm';
+import FilterBar from './components/FilterBar';
 
 function App() {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [newItem, setNewItem] = useState('');
+  const {
+    todos,
+    loading,
+    error,
+    statusFilter,
+    setStatusFilter,
+    searchQuery,
+    setSearchQuery,
+    announcement,
+    createTodo,
+    updateTodo,
+    toggleTodo,
+    deleteTodo,
+  } = useTodos();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingTodo, setEditingTodo] = useState(null);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/items');
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const result = await response.json();
-      setData(result);
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch data: ' + err.message);
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
+  const handleOpenCreate = () => {
+    setEditingTodo(null);
+    setFormOpen(true);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!newItem.trim()) return;
-
-    try {
-      const response = await fetch('/api/items', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: newItem }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to add item');
-      }
-
-      const result = await response.json();
-      setData([...data, result]);
-      setNewItem('');
-    } catch (err) {
-      setError('Error adding item: ' + err.message);
-      console.error('Error adding item:', err);
-    }
+  const handleOpenEdit = (todo) => {
+    setEditingTodo(todo);
+    setFormOpen(true);
   };
 
-  const handleDelete = async (itemId) => {
-    try {
-      const response = await fetch(`/api/items/${itemId}`, {
-        method: 'DELETE',
-      });
+  const handleFormClose = () => {
+    setFormOpen(false);
+    setEditingTodo(null);
+  };
 
-      if (!response.ok) {
-        throw new Error('Failed to delete item');
-      }
-
-      setData(data.filter(item => item.id !== itemId));
-      setError(null);
-    } catch (err) {
-      setError('Error deleting item: ' + err.message);
-      console.error('Error deleting item:', err);
+  const handleSave = async (data) => {
+    if (editingTodo) {
+      await updateTodo(editingTodo.id, data);
+    } else {
+      await createTodo(data);
     }
   };
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>To Do App</h1>
-        <p>Keep track of your tasks</p>
-      </header>
+    <Container maxWidth="md" sx={{ py: { xs: 2, sm: 3 } }}>
+      {/* Accessible live region for dynamic announcements */}
+      <Box
+        aria-live="polite"
+        aria-atomic="true"
+        sx={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }}
+      >
+        {announcement}
+      </Box>
 
-      <main>
-        <section className="add-item-section">
-          <h2>Add New Item</h2>
-          <form onSubmit={handleSubmit}>
-            <input
-              type="text"
-              value={newItem}
-              onChange={(e) => setNewItem(e.target.value)}
-              placeholder="Enter item name"
-            />
-            <button type="submit">Add Item</button>
-          </form>
-        </section>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+        <Box>
+          <Typography variant="h5" component="h1" fontWeight="medium">
+            To Do App
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Keep track of your tasks
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={handleOpenCreate}
+          aria-label="Add new task"
+          size="medium"
+        >
+          Add Task
+        </Button>
+      </Box>
 
-        <section className="items-section">
-          <h2>Items from Database</h2>
-          {loading && <p>Loading data...</p>}
-          {error && <p className="error">{error}</p>}
-          {!loading && !error && (
-            <ul>
-              {data.length > 0 ? (
-                data.map((item) => (
-                  <li key={item.id}>
-                    <span>{item.name}</span>
-                    <button 
-                      onClick={() => handleDelete(item.id)}
-                      className="delete-btn"
-                      type="button"
-                    >
-                      Delete
-                    </button>
-                  </li>
-                ))
-              ) : (
-                <p>No items found. Add some!</p>
-              )}
-            </ul>
-          )}
-        </section>
-      </main>
-    </div>
+      <FilterBar
+        statusFilter={statusFilter}
+        onStatusChange={setStatusFilter}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
+
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress aria-label="Loading tasks" />
+        </Box>
+      )}
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {!loading && !error && todos.length === 0 && (
+        <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+          No tasks found. Add one to get started!
+        </Typography>
+      )}
+
+      {!loading && todos.map((todo) => (
+        <TodoCard
+          key={todo.id}
+          todo={todo}
+          onToggle={toggleTodo}
+          onEdit={handleOpenEdit}
+          onDelete={deleteTodo}
+        />
+      ))}
+
+      <TodoForm
+        open={formOpen}
+        initialData={editingTodo}
+        onSave={handleSave}
+        onClose={handleFormClose}
+      />
+    </Container>
   );
 }
 

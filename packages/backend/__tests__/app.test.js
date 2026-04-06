@@ -1,102 +1,126 @@
-const request = require('supertest');
-const { app, db } = require('../src/app');
+const todoService = require('../src/services/todoService');
+const Database = require('better-sqlite3');
 
-// Close the database connection after all tests
-afterAll(() => {
-  if (db) {
-    db.close();
-  }
+// Use an in-memory database for unit tests
+let db;
+
+beforeEach(() => {
+  db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE todos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      completed INTEGER DEFAULT 0,
+      priority TEXT DEFAULT 'Medium',
+      due_date TEXT DEFAULT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
 });
 
-// Test helpers
-const createItem = async (name = 'Temp Item to Delete') => {
-  const response = await request(app)
-    .post('/api/items')
-    .send({ name })
-    .set('Accept', 'application/json');
+afterEach(() => {
+  db.close();
+});
 
-  expect(response.status).toBe(201);
-  expect(response.body).toHaveProperty('id');
-  return response.body;
-};
+describe('todoService', () => {
+  describe('createTodo', () => {
+    it('creates a todo with required fields', () => {
+      const todo = todoService.createTodo(db, { title: 'Buy groceries' });
 
-describe('API Endpoints', () => {
-  describe('GET /api/items', () => {
-    it('should return all items', async () => {
-      const response = await request(app).get('/api/items');
+      expect(todo).toMatchObject({
+        title: 'Buy groceries',
+        description: '',
+        completed: 0,
+        priority: 'Medium',
+        due_date: null,
+      });
+      expect(todo.id).toBeDefined();
+    });
 
-      expect(response.status).toBe(200);
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThan(0);
+    it('trims whitespace from the title', () => {
+      const todo = todoService.createTodo(db, { title: '  Clean room  ' });
+      expect(todo.title).toBe('Clean room');
+    });
 
-      // Check if items have the expected structure
-      const item = response.body[0];
-      expect(item).toHaveProperty('id');
-      expect(item).toHaveProperty('name');
-      expect(item).toHaveProperty('created_at');
+    it('stores optional description, priority, and due_date', () => {
+      const todo = todoService.createTodo(db, {
+        title: 'Exercise',
+        description: 'Go for a run',
+        priority: 'High',
+        due_date: '2026-12-31',
+      });
+
+      expect(todo.description).toBe('Go for a run');
+      expect(todo.priority).toBe('High');
+      expect(todo.due_date).toBe('2026-12-31');
     });
   });
 
-  describe('POST /api/items', () => {
-    it('should create a new item', async () => {
-      const newItem = { name: 'Test Item' };
-      const response = await request(app)
-        .post('/api/items')
-        .send(newItem)
-        .set('Accept', 'application/json');
-
-      expect(response.status).toBe(201);
-      expect(response.body).toHaveProperty('id');
-      expect(response.body.name).toBe(newItem.name);
-      expect(response.body).toHaveProperty('created_at');
+  describe('getAllTodos', () => {
+    it('returns an empty array when there are no todos', () => {
+      expect(todoService.getAllTodos(db)).toEqual([]);
     });
 
-    it('should return 400 if name is missing', async () => {
-      const response = await request(app)
-        .post('/api/items')
-        .send({})
-        .set('Accept', 'application/json');
-
-      expect(response.status).toBe(400);
-      expect(response.body).toHaveProperty('error');
-      expect(response.body.error).toBe('Item name is required');
-    });
-
-    it('should return 400 if name is empty', async () => {
-      const response = await request(app)
-        .post('/api/items')
-        .send({ name: '' })
-        .set('Accept', 'application/json');
-
-      expect(response.status).toBe(400);
-      expect(response.body).toHaveProperty('error');
-      expect(response.body.error).toBe('Item name is required');
+    it('returns all created todos', () => {
+      todoService.createTodo(db, { title: 'Task A' });
+      todoService.createTodo(db, { title: 'Task B' });
+      const todos = todoService.getAllTodos(db);
+      expect(todos).toHaveLength(2);
     });
   });
 
-  describe('DELETE /api/items/:id', () => {
-    it('should delete an existing item', async () => {
-      const item = await createItem('Item To Be Deleted');
-
-      const deleteResponse = await request(app).delete(`/api/items/${item.id}`);
-      expect(deleteResponse.status).toBe(200);
-      expect(deleteResponse.body).toEqual({ message: 'Item deleted successfully', id: item.id });
-
-      const deleteAgain = await request(app).delete(`/api/items/${item.id}`);
-      expect(deleteAgain.status).toBe(404);
-      expect(deleteAgain.body).toHaveProperty('error', 'Item not found');
+  describe('getTodoById', () => {
+    it('returns the correct todo', () => {
+      const created = todoService.createTodo(db, { title: 'Find me' });
+      const found = todoService.getTodoById(db, created.id);
+      expect(found.title).toBe('Find me');
     });
 
-    it('should return 404 when item does not exist', async () => {
-      const response = await request(app).delete('/api/items/999999');
-      expect(response.status).toBe(404);
-      expect(response.body).toHaveProperty('error', 'Item not found');
+    it('returns undefined for a non-existent id', () => {
+      expect(todoService.getTodoById(db, 9999)).toBeUndefined();
+    });
+  });
+
+  describe('updateTodo', () => {
+    it('updates only the provided fields', () => {
+      const todo = todoService.createTodo(db, { title: 'Original', priority: 'Low' });
+      const updated = todoService.updateTodo(db, todo.id, { title: 'Updated' });
+
+      expect(updated.title).toBe('Updated');
+      expect(updated.priority).toBe('Low');
     });
 
-    it('should return 400 for invalid id', async () => {
-      const response = await request(app).delete('/api/items/abc');
-      expect(response.status).toBe(400);
-      expect(response.body).toHaveProperty('error', 'Valid item ID is required');
+    it('trims whitespace from updated title', () => {
+      const todo = todoService.createTodo(db, { title: 'Trim me' });
+      const updated = todoService.updateTodo(db, todo.id, { title: '  Trimmed  ' });
+      expect(updated.title).toBe('Trimmed');
+    });
+  });
+
+  describe('toggleTodo', () => {
+    it('marks an incomplete todo as completed', () => {
+      const todo = todoService.createTodo(db, { title: 'Toggle me' });
+      expect(todo.completed).toBe(0);
+
+      const toggled = todoService.toggleTodo(db, todo.id);
+      expect(toggled.completed).toBe(1);
+    });
+
+    it('marks a completed todo as incomplete', () => {
+      const todo = todoService.createTodo(db, { title: 'Toggle me back' });
+      todoService.toggleTodo(db, todo.id);
+      const toggled = todoService.toggleTodo(db, todo.id);
+      expect(toggled.completed).toBe(0);
+    });
+  });
+
+  describe('deleteTodo', () => {
+    it('removes the todo from the database', () => {
+      const todo = todoService.createTodo(db, { title: 'Delete me' });
+      todoService.deleteTodo(db, todo.id);
+      expect(todoService.getTodoById(db, todo.id)).toBeUndefined();
     });
   });
 });
